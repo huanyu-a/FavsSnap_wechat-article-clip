@@ -373,24 +373,26 @@ def scrape_one(url: str, output_dir: str, log, index: int = 0, total: int = 0) -
 
 DEFAULT_OUTPUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
 
-# 薄荷绿知识卡片风格配色
+# 薄荷绿知识卡片风格配色 — Claude Design 原则
 COLORS = {
-    'bg': '#f0faf5',              # 主背景 浅薄荷绿
+    'bg': '#f6faf7',              # 主背景 暖调薄荷绿画布
     'surface': '#ffffff',          # 卡片背景 白
-    'surface2': '#e8f5ee',         # 输入框背景 浅绿
-    'border': '#c5e3d1',           # 边框 柔绿
-    'border_light': '#dceee4',     # 浅边框
-    'text': '#2d3a33',             # 主文字 深灰绿
-    'text_mid': '#4a6355',         # 中等文字
-    'text_dim': '#7a9a8a',         # 次要文字
+    'surface2': '#f1f8f3',         # 输入框背景 浅绿卡片色
+    'surface_dark': '#1b2d25',     # 深绿表面（日志区色块深度）
+    'border': '#d4e8db',           # 边框 柔和发丝线
+    'border_light': '#e3efe6',     # 浅边框
+    'text': '#1a1f1c',             # 主文字 暖深色
+    'text_mid': '#3b423d',         # 中等文字
+    'text_dim': '#6a736c',         # 次要文字
+    'text_soft': '#8c948b',        # 柔和文字
     'accent': '#3bb88a',           # 主色 松石绿
     'accent_hover': '#2ea077',     # 主色悬停
-    'accent_light': '#d4f0e4',     # 主色浅底
-    'green': '#34a853',            # 成功
-    'red': '#e85d5d',              # 失败
-    'yellow': '#e8a832',           # 警告
+    'accent_light': '#dbf5e8',     # 主色浅底
+    'green': '#2d8c5a',            # 成功
+    'red': '#d44a4a',              # 失败
+    'yellow': '#c8921e',           # 警告
     'blue': '#4a90d9',             # 信息
-    'peach': '#e88a5d',            # 高亮
+    'peach': '#d47a3c',            # 高亮
 }
 
 
@@ -409,16 +411,16 @@ def setup_styles():
     style.configure('TLabel', background=COLORS['bg'], foreground=COLORS['text'],
                     font=('Microsoft YaHei UI', 10))
     style.configure('Card.TLabel', background=COLORS['surface'])
-    style.configure('Dim.TLabel', foreground=COLORS['text_dim'])
-    style.configure('Mid.TLabel', foreground=COLORS['text_mid'])
-    style.configure('Title.TLabel', font=('Microsoft YaHei UI', 15, 'bold'),
+    style.configure('Dim.TLabel', foreground=COLORS['text_soft'], font=('Microsoft YaHei UI', 9))
+    style.configure('Mid.TLabel', foreground=COLORS['text_mid'], font=('Microsoft YaHei UI', 10))
+    style.configure('Title.TLabel', font=('Microsoft YaHei UI', 16, 'bold'),
                     foreground=COLORS['accent'])
     style.configure('Sub.TLabel', font=('Microsoft YaHei UI', 9),
-                    foreground=COLORS['text_dim'])
+                    foreground=COLORS['text_soft'])
     style.configure('Section.TLabel', font=('Microsoft YaHei UI', 10, 'bold'),
                     foreground=COLORS['text_mid'], background=COLORS['surface'])
 
-    style.configure('TEntry', fieldbackground=COLORS['surface'],
+    style.configure('TEntry', fieldbackground=COLORS['surface2'],
                     bordercolor=COLORS['border'], insertcolor=COLORS['text'],
                     lightcolor=COLORS['border_light'])
     style.map('TEntry',
@@ -427,15 +429,15 @@ def setup_styles():
 
     style.configure('Accent.TButton', background=COLORS['accent'],
                     foreground='#ffffff', font=('Microsoft YaHei UI', 10, 'bold'),
-                    padding=(20, 7), relief='flat')
+                    padding=(22, 8), relief='flat')
     style.map('Accent.TButton',
               background=[('active', COLORS['accent_hover']),
                           ('disabled', COLORS['border_light'])],
-              foreground=[('disabled', COLORS['text_dim'])])
+              foreground=[('disabled', COLORS['text_soft'])])
 
     style.configure('TButton', background=COLORS['surface'],
                     foreground=COLORS['text_mid'], font=('Microsoft YaHei UI', 9),
-                    padding=(10, 4), relief='flat',
+                    padding=(12, 5), relief='flat',
                     bordercolor=COLORS['border'])
     style.map('TButton',
               background=[('active', COLORS['accent_light'])],
@@ -443,25 +445,24 @@ def setup_styles():
 
     style.configure('Horizontal.TProgressbar',
                     background=COLORS['accent'],
-                    troughcolor=COLORS['surface'],
-                    bordercolor=COLORS['surface'],
+                    troughcolor=COLORS['surface2'],
+                    bordercolor=COLORS['border_light'],
                     lightcolor=COLORS['accent'],
                     darkcolor=COLORS['accent'],
-                    thickness=6)
+                    thickness=5)
 
-    # 卡片内标题行的 Frame 背景
     style.configure('CardTitle.TFrame', background=COLORS['surface'])
     style.configure('CardTitle.TLabel', background=COLORS['surface'],
-                    foreground=COLORS['accent'], font=('Microsoft YaHei UI', 10, 'bold'))
+                    foreground=COLORS['text'], font=('Microsoft YaHei UI', 10, 'bold'))
     style.configure('CardDim.TLabel', background=COLORS['surface'],
-                    foreground=COLORS['text_dim'])
+                    foreground=COLORS['text_soft'], font=('Microsoft YaHei UI', 9))
 
 
 class RoundedButton(tk.Canvas):
     """Canvas 实现的圆角按钮"""
 
-    def __init__(self, parent, text, command=None, radius=10,
-                 bg=None, fg='#ffffff', hover_bg=None, font=None, padx=16, pady=6, **kwargs):
+    def __init__(self, parent, text, command=None, radius=12,
+                 bg=None, fg='#ffffff', hover_bg=None, font=None, padx=20, pady=8, **kwargs):
         self.bg = bg or COLORS['accent']
         self.hover_bg = hover_bg or COLORS['accent_hover']
         self.fg = fg
@@ -573,7 +574,7 @@ class App:
         ttk.Label(frm_url_label, text="文章链接", style='CardTitle.TLabel').pack(side=tk.LEFT)
         ttk.Label(frm_url_label, text="每行一条", style='CardDim.TLabel').pack(side=tk.LEFT, padx=(8, 0))
 
-        self.txt_urls = tk.Text(card_url, height=6, wrap=tk.WORD,
+        self.txt_urls = tk.Text(card_url, height=3, wrap=tk.WORD,
                                 bg=COLORS['surface'], fg=COLORS['text'],
                                 insertbackground=COLORS['accent'],
                                 selectbackground=COLORS['accent_light'],
@@ -592,7 +593,7 @@ class App:
 
         # --- 输出目录 + 操作栏（同一行） ---
         frm_bottom = ttk.Frame(main)
-        frm_bottom.pack(fill=tk.X, pady=(12, 0))
+        frm_bottom.pack(fill=tk.X, pady=(0, 12))
 
         frm_dir = ttk.Frame(frm_bottom)
         frm_dir.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -601,17 +602,17 @@ class App:
         dir_entry = ttk.Entry(frm_dir, textvariable=self.var_dir)
         dir_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(8, 6))
         RoundedButton(frm_dir, "浏览", command=self.browse_dir,
-                      bg=COLORS['border'], hover_bg=COLORS['accent_light'],
+                      bg=COLORS['surface2'], hover_bg=COLORS['accent_light'],
                       fg=COLORS['text_mid'], font=('Microsoft YaHei UI', 9),
-                      padx=12, pady=4).pack(side=tk.LEFT)
+                      padx=14, pady=5).pack(side=tk.LEFT)
 
         frm_action = ttk.Frame(frm_bottom)
         frm_action.pack(side=tk.RIGHT, padx=(12, 0))
         self.btn_start = RoundedButton(frm_action, "开始抓取", command=self.start,
                                        bg=COLORS['accent'], hover_bg=COLORS['accent_hover'],
                                        fg='#ffffff',
-                                       font=('Microsoft YaHei UI', 10, 'bold'),
-                                       padx=20, pady=7)
+                                       font=('Microsoft YaHei UI', 10),
+                                       padx=22, pady=8)
         self.btn_start.pack(side=tk.RIGHT)
 
         self.lbl_status = ttk.Label(frm_action, text="就绪", style='Dim.TLabel')
@@ -634,24 +635,24 @@ class App:
         # 初始隐藏，运行时显示
 
         self.txt_log = tk.Text(card_log, height=8, wrap=tk.WORD,
-                               bg=COLORS['bg'], fg=COLORS['text_dim'],
+                               bg=COLORS['surface_dark'], fg='#8e9b93',
                                relief=tk.FLAT, bd=0,
                                highlightthickness=1,
-                               highlightbackground=COLORS['border_light'],
-                               highlightcolor=COLORS['border_light'],
+                               highlightbackground=COLORS['surface_dark'],
+                               highlightcolor=COLORS['surface_dark'],
                                font=('Consolas', 9),
                                padx=10, pady=8,
                                state=tk.DISABLED,
                                cursor='arrow')
         self.txt_log.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
 
-        # 日志颜色标签
-        self.txt_log.tag_configure('info', foreground=COLORS['blue'])
-        self.txt_log.tag_configure('success', foreground=COLORS['green'])
-        self.txt_log.tag_configure('error', foreground=COLORS['red'])
-        self.txt_log.tag_configure('warn', foreground=COLORS['yellow'])
-        self.txt_log.tag_configure('highlight', foreground=COLORS['peach'])
-        self.txt_log.tag_configure('dim', foreground=COLORS['text_dim'])
+        # 日志颜色标签（深色背景适配）
+        self.txt_log.tag_configure('info', foreground='#7bc8e0')
+        self.txt_log.tag_configure('success', foreground='#6dd49e')
+        self.txt_log.tag_configure('error', foreground='#f2776e')
+        self.txt_log.tag_configure('warn', foreground='#e8c96a')
+        self.txt_log.tag_configure('highlight', foreground='#f2ae72')
+        self.txt_log.tag_configure('dim', foreground='#6a726a')
 
     def _rounded_rect(self, canvas, x1, y1, x2, y2, radius, fill, outline, tag=''):
         """在 Canvas 上绘制圆角矩形"""
@@ -670,8 +671,8 @@ class App:
 
     def _make_card(self, parent, expand=False):
         """创建圆角白色卡片容器"""
-        R = 12  # 圆角半径
-        PAD = 8  # 卡片外边距
+        R = 14  # 圆角半径
+        PAD = 10  # 卡片外边距
 
         # 外层 Canvas 用于绘制圆角背景
         canvas = tk.Canvas(parent, bg=COLORS['bg'], highlightthickness=0, bd=0)
@@ -681,7 +682,7 @@ class App:
         canvas.pack(**pack_opts)
 
         # 内容 Frame 放在 Canvas 内部
-        inner = tk.Frame(canvas, bg=COLORS['surface'], padx=16, pady=14)
+        inner = tk.Frame(canvas, bg=COLORS['surface'], padx=18, pady=16)
         inner_id = canvas.create_window(0, 0, window=inner, anchor='nw')
 
         def _resize(event):
@@ -690,8 +691,8 @@ class App:
             self._rounded_rect(canvas, 1, 1, w - 2, h - 2, R,
                                fill=COLORS['surface'], outline=COLORS['border'], tag='bg')
             canvas.tag_lower('bg')
-            canvas.coords(inner_id, 16, 14)
-            canvas.itemconfigure(inner_id, width=w - 32, height=h - 28)
+            canvas.coords(inner_id, 18, 16)
+            canvas.itemconfigure(inner_id, width=w - 36, height=h - 32)
 
         canvas.bind('<Configure>', _resize)
         return inner
@@ -700,7 +701,7 @@ class App:
         """顶部渐变装饰条"""
         bar = tk.Canvas(parent, height=4, highlightthickness=0, bd=0)
         bar.pack(fill=tk.X, pady=(0, 4))
-        colors = ['#3bb88a', '#5ec9a0', '#88d9b8', '#b0e8d0']
+        colors = ['#3bb88a', '#5bc49c', '#7ed4b2', '#a6e3ca']
         w = 800
         seg = w // len(colors)
         for i, c in enumerate(colors):
