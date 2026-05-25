@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 FavsSnap — 微信公众号文章剪藏工具
 
@@ -8,6 +9,18 @@ import os, re, sys, hashlib, threading, ctypes
 from datetime import datetime
 from typing import Optional, Dict, List, Tuple
 from urllib.parse import urlparse, urljoin
+
+# 设置Windows控制台UTF-8编码
+if sys.platform == 'win32':
+    try:
+        # 设置控制台代码页为UTF-8
+        ctypes.windll.kernel32.SetConsoleCP(65001)
+        ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+        # 重新配置stdout和stderr为UTF-8
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 import requests, chardet
 from bs4 import BeautifulSoup
 import tkinter as tk
@@ -28,19 +41,15 @@ def fetch_article(url: str) -> Optional[str]:
     try:
         resp = requests.get(url, headers=HEADERS, timeout=15)
         resp.raise_for_status()
-        raw = resp.content
-        detected = chardet.detect(raw)
-        enc = detected.get('encoding') or 'utf-8'
-        try:
-            return raw.decode(enc)
-        except (UnicodeDecodeError, LookupError):
-            return raw.decode('utf-8', errors='replace')
+        # 微信文章统一使用 UTF-8 编码
+        resp.encoding = 'utf-8'
+        return resp.text
     except Exception:
         return None
 
 
 def extract_article_content(html: str, url: str) -> Dict:
-    soup = BeautifulSoup(html, 'lxml')
+    soup = BeautifulSoup(html, 'html.parser')
 
     title = ""
     title_tag = soup.find('h1', class_='rich_media_title') or soup.find('h2', class_='rich_media_title')
@@ -135,7 +144,7 @@ def html_to_markdown(content_html: str, url: str, image_mapping: dict) -> str:
     if not content_html:
         return ""
 
-    soup = BeautifulSoup(content_html, 'lxml')
+    soup = BeautifulSoup(content_html, 'html.parser')
 
     def block_join(parts):
         """Join child results: space between inline elements, no space before block newlines."""
@@ -170,6 +179,7 @@ def html_to_markdown(content_html: str, url: str, image_mapping: dict) -> str:
             return None
 
         if element.name == 'pre':
+            # 优先查找 code 标签
             code = element.find('code')
             if code:
                 lines = []
@@ -186,6 +196,12 @@ def html_to_markdown(content_html: str, url: str, image_mapping: dict) -> str:
                             lines.append(t)
                 code_text = '\n'.join(lines)
                 return f'\n```\n{code_text}\n```\n\n'
+            else:
+                # 没有 code 标签，直接获取 pre 的文本内容（微信公众号格式）
+                # 保留原始换行，但去除首尾空白
+                code_text = element.get_text(strip=False).strip()
+                if code_text:
+                    return f'\n```\n{code_text}\n```\n\n'
             return None
 
         if element.name == 'code':
@@ -237,6 +253,32 @@ def html_to_markdown(content_html: str, url: str, image_mapping: dict) -> str:
             lines = element.get_text(strip=False).splitlines()
             return '\n'.join(f'> {line}' for line in lines) + '\n\n'
 
+        if element.name == 'table':
+            # 处理表格
+            rows = []
+            thead = element.find('thead')
+            tbody = element.find('tbody')
+
+            # 获取所有行
+            all_trs = element.find_all('tr')
+            if not all_trs:
+                return None
+
+            # 处理表头（第一行）
+            first_row = all_trs[0]
+            headers = [cell.get_text(strip=True) for cell in first_row.find_all(['th', 'td'])]
+            if headers:
+                rows.append('| ' + ' | '.join(headers) + ' |')
+                rows.append('| ' + ' | '.join(['---'] * len(headers)) + ' |')
+
+            # 处理数据行（从第二行开始）
+            for tr in all_trs[1:]:
+                cells = [td.get_text(strip=True) for td in tr.find_all(['td', 'th'])]
+                if cells:
+                    rows.append('| ' + ' | '.join(cells) + ' |')
+
+            return '\n' + '\n'.join(rows) + '\n\n' if rows else None
+
         if element.name == 'br':
             return "\n\n"
 
@@ -260,14 +302,22 @@ def html_to_markdown(content_html: str, url: str, image_mapping: dict) -> str:
     return result.strip()
 
 
-def get_image_filename(url: str, index: int, article_index: int = 0) -> str:
+def extract_article_id(url: str) -> str:
+    """从微信文章URL中提取文章ID（/s/之后的部分）"""
+    try:
+        match = re.search(r'/s/([^/?#]+)', url)
+        return match.group(1) if match else 'unknown'
+    except Exception:
+        return 'unknown'
+
+
+def get_image_filename(url: str, index: int, article_id: str) -> str:
     parsed = urlparse(url)
     ext = os.path.splitext(parsed.path)[1]
     if not ext or len(ext) > 5:
         ext = '.jpg'
     url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
-    prefix = f"A{article_index:02d}_" if article_index else ""
-    return f"img_{prefix}{index:03d}_{url_hash}{ext}"
+    return f"{article_id}_{index:03d}_{url_hash}{ext}"
 
 
 def download_image(url: str, save_path: str, timeout: int = 10) -> bool:
@@ -284,7 +334,7 @@ def download_image(url: str, save_path: str, timeout: int = 10) -> bool:
 
 
 def extract_images(html_content: str, base_url: str) -> List[Tuple[str, any]]:
-    soup = BeautifulSoup(html_content, 'lxml')
+    soup = BeautifulSoup(html_content, 'html.parser')
     images = []
     for img in soup.find_all('img'):
         src = img.get('src') or img.get('data-src')
@@ -293,14 +343,14 @@ def extract_images(html_content: str, base_url: str) -> List[Tuple[str, any]]:
     return images
 
 
-def save_images(images: List[Tuple[str, any]], output_dir: str, article_index: int = 0) -> dict:
+def save_images(images: List[Tuple[str, any]], output_dir: str, article_id: str) -> dict:
     images_dir = os.path.join(output_dir, 'images')
     os.makedirs(images_dir, exist_ok=True)
     url_mapping = {}
     for idx, (img_url, _) in enumerate(images, 1):
         if img_url in url_mapping:
             continue
-        filename = get_image_filename(img_url, idx, article_index)
+        filename = get_image_filename(img_url, idx, article_id)
         save_path = os.path.join(images_dir, filename)
         if download_image(img_url, save_path):
             url_mapping[img_url] = f"images/{filename}"
@@ -316,12 +366,13 @@ def scrape_one(url: str, output_dir: str, log, index: int = 0, total: int = 0) -
         return False
 
     article = extract_article_content(html, url)
+    article_id = extract_article_id(url)
 
     if article['is_slideshow']:
         # 贴图文章：文字 + 幻灯片图片
         slideshow_imgs = article['slideshow_images']
         img_tuples = [(u, None) for u in slideshow_imgs]
-        image_mapping = save_images(img_tuples, output_dir, index) if img_tuples else {}
+        image_mapping = save_images(img_tuples, output_dir, article_id) if img_tuples else {}
 
         # 构建 Markdown：文字 + 图片
         md_parts = []
@@ -337,7 +388,7 @@ def scrape_one(url: str, output_dir: str, log, index: int = 0, total: int = 0) -
     else:
         # 普通文章：只从正文区域提取图片
         images = extract_images(article['content_html'], url)
-        image_mapping = save_images(images, output_dir, index) if images else {}
+        image_mapping = save_images(images, output_dir, article_id) if images else {}
         md = html_to_markdown(article['content_html'], url, image_mapping)
 
     frontmatter = [f"# {article['title']}", ""]

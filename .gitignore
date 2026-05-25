@@ -4,3 +4,8 @@ node_modules
 .claude/
 .git/
 output/
+__pycache__/
+*.pyc
+debug.html
+run_single.py
+test_table.py
