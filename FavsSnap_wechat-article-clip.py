@@ -6,6 +6,7 @@ FavsSnap — 微信公众号文章剪藏工具
 将微信公号文章转换为 本地Markdown + 本地图片，支持批量剪藏。
 """
 import os, re, sys, hashlib, threading, ctypes
+from PIL import Image, ImageTk
 from datetime import datetime
 from typing import Optional, Dict, List, Tuple
 from urllib.parse import urlparse, urljoin
@@ -197,9 +198,25 @@ def html_to_markdown(content_html: str, url: str, image_mapping: dict) -> str:
                 code_text = '\n'.join(lines)
                 return f'\n```\n{code_text}\n```\n\n'
             else:
-                # 没有 code 标签，直接获取 pre 的文本内容（微信公众号格式）
-                # 保留原始换行，但去除首尾空白
-                code_text = element.get_text(strip=False).strip()
+                # 没有 code 标签，直接遍历 pre 的子元素（微信公众号格式）
+                # 支持 span 中包含 br 的换行结构
+                parts = []
+                for child in element.children:
+                    if isinstance(child, str):
+                        t = child.strip()
+                        if t:
+                            parts.append(t)
+                    elif child.name == 'br':
+                        parts.append('')
+                    else:
+                        # span 中只有 br 的情况 -> 换行
+                        inner_br = child.find('br')
+                        if inner_br:
+                            parts.append('')
+                        t = child.get_text(strip=True)
+                        if t:
+                            parts.append(t)
+                code_text = '\n'.join(parts)
                 if code_text:
                     return f'\n```\n{code_text}\n```\n\n'
             return None
@@ -609,13 +626,30 @@ class App:
         # --- 顶部装饰条 ---
         self._gradient_bar(main)
 
-        # --- 标题区（居中） ---
+        # --- 标题区（居中，logo + 文字） ---
         frm_header = ttk.Frame(main)
         frm_header.pack(fill=tk.X, pady=(12, 16))
-        ttk.Label(frm_header, text="FavsSnap",
-                  style='Title.TLabel').pack(anchor=tk.CENTER)
-        ttk.Label(frm_header, text="将微信文章剪藏为 本地Markdown + 本地图片",
-                  style='Sub.TLabel').pack(anchor=tk.CENTER, pady=(3, 0))
+        frm_title = ttk.Frame(frm_header)
+        frm_title.pack(anchor=tk.CENTER)
+
+        # 品牌 logo
+        logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logo.png')
+        self._header_logo = None
+        if os.path.exists(logo_path):
+            try:
+                pil_img = Image.open(logo_path).resize((48, 48), Image.LANCZOS)
+                self._header_logo = ImageTk.PhotoImage(pil_img)
+                tk.Label(frm_title, image=self._header_logo,
+                         bg=COLORS.get('canvas', '#f6faf7')).pack(side=tk.LEFT, padx=(0, 12))
+            except Exception:
+                pass
+
+        frm_text = ttk.Frame(frm_title)
+        frm_text.pack(side=tk.LEFT)
+        ttk.Label(frm_text, text="FavsSnap",
+                  style='Title.TLabel').pack(anchor=tk.W)
+        ttk.Label(frm_text, text="将微信文章剪藏为 本地Markdown + 本地图片",
+                  style='Sub.TLabel').pack(anchor=tk.W, pady=(3, 0))
 
         # --- 链接输入卡片 ---
         card_url = self._make_card(main, expand=True)
